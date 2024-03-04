@@ -7,7 +7,6 @@ from config import DUFFEL_ACCESS_TOKEN
 app = Flask(__name__)
 CORS(app)
 
-
 def fetch_flight_offers():
     url = "https://api.duffel.com/air/offer_requests"
     headers = {
@@ -19,35 +18,26 @@ def fetch_flight_offers():
     try:
         response = requests.post(url, json=payload, headers=headers)
         response.raise_for_status()
-        offers_data = response.json().get("data", {}).get("offers", [])
+        offers_response = response.json()
 
-        filtered_offers = []
-        for offer in offers_data:
-            # Check if 'services' key exists and has at least one item
-            if "services" in offer and offer["services"]:
-                first_service = offer["services"][0]
-                # Further checks can be added here for nested keys
-                if "segments" in first_service and first_service["segments"]:
-                    first_segment = first_service["segments"][0]
-                    if (
-                        "operating_carrier" in first_segment
-                        and first_segment["operating_carrier"]
-                    ):
-                        airline_name = first_segment["operating_carrier"].get(
-                            "name", "Unknown Airline"
-                        )
-                        filtered_offers.append(
-                            {
-                                "total_amount": offer.get("total_amount", "Unknown"),
-                                "total_currency": offer.get(
-                                    "total_currency", "Unknown"
-                                ),
-                                "airline": airline_name,
-                            }
-                        )
+        offers_data = offers_response.get("data", {}).get("offers", [])
 
-        print(filtered_offers)  # Print the filtered offers
-        return jsonify(filtered_offers)
+        offers_details = []
+        for offer in offers_data[:4]:
+            offer_details = {
+                "total_amount": offer.get("total_amount"),
+                "base_currency": offer.get("base_currency"),
+                "departing_at": offer["slices"][0]["segments"][0].get("departing_at"),
+                "arriving_at": offer["slices"][0]["segments"][0].get("arriving_at"),
+                "stops": len(offer["slices"][0]["segments"][0].get("stops", [])),
+                "duration": offer["slices"][0].get("duration"),
+                "origin_iata_code": offer["slices"][0]["segments"][0]["origin"].get("iata_code"),
+                "destination_iata_code": offer["slices"][0]["segments"][0]["destination"].get("iata_code"),
+                "operating_carrier_name": offer["slices"][0]["segments"][0]["operating_carrier"].get("name")
+            }
+            offers_details.append(offer_details)
+
+        return jsonify(offers_details)
     except requests.exceptions.HTTPError as http_err:
         logging.error(f"HTTP error occurred: {http_err} - {response.text}")
         return jsonify({"error": "Failed to fetch flight offers"}), 500
