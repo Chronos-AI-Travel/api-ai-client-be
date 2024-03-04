@@ -23,19 +23,24 @@ def fetch_flight_offers():
         offers_data = offers_response.get("data", {}).get("offers", [])
 
         offers_details = []
-        for offer in offers_data[:4]:
-            offer_details = {
-                "total_amount": offer.get("total_amount"),
-                "base_currency": offer.get("base_currency"),
-                "departing_at": offer["slices"][0]["segments"][0].get("departing_at"),
-                "arriving_at": offer["slices"][0]["segments"][0].get("arriving_at"),
-                "stops": len(offer["slices"][0]["segments"][0].get("stops", [])),
-                "duration": offer["slices"][0].get("duration"),
-                "origin_iata_code": offer["slices"][0]["segments"][0]["origin"].get("iata_code"),
-                "destination_iata_code": offer["slices"][0]["segments"][0]["destination"].get("iata_code"),
-                "operating_carrier_name": offer["slices"][0]["segments"][0]["operating_carrier"].get("name")
-            }
-            offers_details.append(offer_details)
+        for offer in offers_data[:4]:  # Assuming you still want to limit to the first 4 offers
+            slices_details = []
+            for slice in offer["slices"]:
+                # Assuming each slice has at least one segment
+                first_segment = slice["segments"][0]
+                slice_details = {
+                    "total_amount": offer.get("total_amount"),
+                    "base_currency": offer.get("base_currency"),
+                    "departing_at": first_segment.get("departing_at"),
+                    "arriving_at": first_segment.get("arriving_at"),
+                    "stops": len(first_segment.get("stops", [])),
+                    "duration": slice.get("duration"),
+                    "origin_iata_code": first_segment["origin"].get("iata_code"),
+                    "destination_iata_code": first_segment["destination"].get("iata_code"),
+                    "operating_carrier_name": first_segment["operating_carrier"].get("name")
+                }
+                slices_details.append(slice_details)
+            offers_details.append({"slices": slices_details})
 
         return jsonify(offers_details)
     except requests.exceptions.HTTPError as http_err:
