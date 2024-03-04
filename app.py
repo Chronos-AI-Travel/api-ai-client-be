@@ -7,6 +7,7 @@ from config import DUFFEL_ACCESS_TOKEN
 app = Flask(__name__)
 CORS(app)
 
+
 def fetch_flight_offers():
     url = "https://api.duffel.com/air/offer_requests"
     headers = {
@@ -23,8 +24,11 @@ def fetch_flight_offers():
         offers_data = offers_response.get("data", {}).get("offers", [])
 
         offers_details = []
-        for offer in offers_data[:4]:  # Assuming you still want to limit to the first 4 offers
+        for offer in offers_data[
+            :4
+        ]:  # Assuming you still want to limit to the first 4 offers
             slices_details = []
+            passenger_ids = [passenger["id"] for passenger in offer.get("passengers", [])]
             for slice in offer["slices"]:
                 # Assuming each slice has at least one segment
                 first_segment = slice["segments"][0]
@@ -36,11 +40,21 @@ def fetch_flight_offers():
                     "stops": len(first_segment.get("stops", [])),
                     "duration": slice.get("duration"),
                     "origin_iata_code": first_segment["origin"].get("iata_code"),
-                    "destination_iata_code": first_segment["destination"].get("iata_code"),
-                    "operating_carrier_name": first_segment["operating_carrier"].get("name")
+                    "destination_iata_code": first_segment["destination"].get(
+                        "iata_code"
+                    ),
+                    "operating_carrier_name": first_segment["operating_carrier"].get(
+                        "name"
+                    ),
                 }
                 slices_details.append(slice_details)
-            offers_details.append({"slices": slices_details})
+            offers_details.append(
+                {
+                    "id": offer["id"],
+                    "slices": slices_details,
+                    "passenger_ids": passenger_ids,
+                }
+            )
 
         return jsonify(offers_details)
     except requests.exceptions.HTTPError as http_err:
@@ -59,6 +73,31 @@ def get_flight_offers():
 @app.route("/")
 def hello_world():
     return "Hello, Cross-Origin World!"
+
+
+@app.route("/create_order", methods=["POST"])
+def create_order():
+    url = "https://api.duffel.com/air/orders"
+    headers = {
+        "Authorization": f"Bearer {DUFFEL_ACCESS_TOKEN}",
+        "Duffel-Version": "v1",
+        "Content-Type": "application/json",
+    }
+    payload = (
+        request.json
+    )  # This should include the selected offer ID and passenger details
+
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+        order_response = response.json()
+        return jsonify(order_response), 200
+    except requests.exceptions.HTTPError as http_err:
+        logging.error(f"HTTP error occurred: {http_err} - {response.text}")
+        return jsonify({"error": "Failed to create order"}), response.status_code
+    except Exception as err:
+        logging.error(f"An error occurred: {err}")
+        return jsonify({"error": "An unexpected error occurred"}), 500
 
 
 if __name__ == "__main__":
