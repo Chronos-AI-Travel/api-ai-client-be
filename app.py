@@ -28,7 +28,9 @@ def fetch_flight_offers():
             :4
         ]:  # Assuming you still want to limit to the first 4 offers
             slices_details = []
-            passenger_ids = [passenger["id"] for passenger in offer.get("passengers", [])]
+            passenger_ids = [
+                passenger["id"] for passenger in offer.get("passengers", [])
+            ]
             for slice in offer["slices"]:
                 # Assuming each slice has at least one segment
                 first_segment = slice["segments"][0]
@@ -58,8 +60,14 @@ def fetch_flight_offers():
 
         return jsonify(offers_details)
     except requests.exceptions.HTTPError as http_err:
-        logging.error(f"HTTP error occurred: {http_err} - {response.text}")
-        return jsonify({"error": "Failed to fetch flight offers"}), 500
+        error_response = response.json()
+        logging.error(f"HTTP error occurred: {http_err} - {error_response}")
+
+        error_messages = [
+            error["message"] for error in error_response.get("errors", [])
+        ]
+
+        return jsonify({"errors": error_messages}), response.status_code
     except Exception as err:
         logging.error(f"An error occurred: {err}")
         return jsonify({"error": "An unexpected error occurred"}), 500
@@ -99,6 +107,25 @@ def create_order():
         logging.error(f"An error occurred: {err}")
         return jsonify({"error": "An unexpected error occurred"}), 500
 
+
+@app.route("/duffel-webhook", methods=["POST"])
+def duffel_webhook():
+    data = request.json
+    event_type = data.get("type")
+    
+    # Check for the specific event type you're interested in, e.g., order.created
+    if event_type == "order.created":
+        # Extract passenger email and other details
+        passenger_email = data["data"]["passengers"][0]["email"]
+        # Send booking confirmation email
+        send_booking_confirmation_email(passenger_email)
+    
+    return jsonify({"message": "Webhook received"}), 200
+
+def send_booking_confirmation_email(email):
+    msg = Message("Booking Confirmation", sender="your-email@example.com", recipients=[email])
+    msg.body = "Your booking has been confirmed."
+    mail.send(msg)
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
