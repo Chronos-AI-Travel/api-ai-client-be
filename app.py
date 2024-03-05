@@ -119,14 +119,23 @@ def create_order():
 def duffel_webhook():
     data = request.json
     event_type = data.get("type")
-    if event_type == "order.created":
-        passenger_email = data["data"]["passengers"][0]["email"]
-        send_booking_confirmation_email(passenger_email)
+    
+    # Check if 'passengers' key exists in the data
+    if event_type == "order.created" and "passengers" in data.get("data", {}):
+        passenger_email = data["data"]["passengers"][0].get("email")
+        if passenger_email:
+            send_booking_confirmation_email(passenger_email)
+        else:
+            # Log or handle the case where the email is not provided
+            logging.error("Passenger email not found in the webhook data.")
+    else:
+        # Log or handle the case where the 'passengers' key is missing
+        logging.error(f"Webhook event {event_type} does not contain 'passengers' data.")
     
     return jsonify({"message": "Webhook received"}), 200
 
 def send_booking_confirmation_email(email):
-    msg = Message("Booking Confirmation", sender="your-email@example.com", recipients=[email])
+    msg = Message("Booking Confirmation", sender="joshsparkes6@gmail.com", recipients=[email])
     msg.body = "Your booking has been confirmed."
     mail.send(msg)
 
