@@ -9,12 +9,12 @@ app = Flask(__name__)
 CORS(app)
 
 # Flask-Mail configuration
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'  # The mail server
-app.config['MAIL_PORT'] = 587  # The mail server port
-app.config['MAIL_USE_TLS'] = True  # Use TLS
-app.config['MAIL_USERNAME'] = 'joshsparkes6@gmail.com'  # Your email username
-app.config['MAIL_PASSWORD'] = '1Time4UrM'  # Your email password
-app.config['MAIL_DEFAULT_SENDER'] = 'joshsparkes6@gmail.com'  # Default sender
+app.config["MAIL_SERVER"] = "smtp.gmail.com"  # The mail server
+app.config["MAIL_PORT"] = 587  # The mail server port
+app.config["MAIL_USE_TLS"] = True  # Use TLS
+app.config["MAIL_USERNAME"] = "joshsparkes6@gmail.com"  # Your email username
+app.config["MAIL_PASSWORD"] = "1Time4UrM"  # Your email password
+app.config["MAIL_DEFAULT_SENDER"] = "joshsparkes6@gmail.com"  # Default sender
 
 mail = Mail(app)  # Initialize Flask-Mail
 
@@ -83,13 +83,16 @@ def fetch_flight_offers():
         logging.error(f"An error occurred: {err}")
         return jsonify({"error": "An unexpected error occurred"}), 500
 
+
 @app.route("/get_flight_offers", methods=["POST"])
 def get_flight_offers():
     return fetch_flight_offers()
 
+
 @app.route("/")
 def hello_world():
     return "Hello, Cross-Origin World!"
+
 
 @app.route("/create_order", methods=["POST"])
 def create_order():
@@ -115,29 +118,41 @@ def create_order():
         logging.error(f"An error occurred: {err}")
         return jsonify({"error": "An unexpected error occurred"}), 500
 
+
 @app.route("/duffel-webhook", methods=["POST"])
 def duffel_webhook():
     data = request.json
-    event_type = data.get("type")
-    
-    # Check if 'passengers' key exists in the data
-    if event_type == "order.created" and "passengers" in data.get("data", {}):
-        passenger_email = data["data"]["passengers"][0].get("email")
-        if passenger_email:
-            send_booking_confirmation_email(passenger_email)
-        else:
-            # Log or handle the case where the email is not provided
-            logging.error("Passenger email not found in the webhook data.")
-    else:
-        # Log or handle the case where the 'passengers' key is missing
-        logging.error(f"Webhook event {event_type} does not contain 'passengers' data.")
-    
+    if data.get("object") and data["object"].get("id"):
+        order_id = data["object"]["id"]
+        order_details = fetch_order_details(order_id)
+        for passenger in order_details.get("passengers", []):
+            passenger_email = passenger.get("email")
+            if passenger_email:
+                send_booking_confirmation_email(passenger_email)
     return jsonify({"message": "Webhook received"}), 200
 
+
+def fetch_order_details(order_id):
+    url = f"https://api.duffel.com/air/orders/{order_id}"
+    headers = {
+        "Authorization": f"Bearer {DUFFEL_ACCESS_TOKEN}",
+        "Duffel-Version": "v1",
+        "Content-Type": "application/json",
+    }
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        return {}
+
+
 def send_booking_confirmation_email(email):
-    msg = Message("Booking Confirmation", sender="joshsparkes6@gmail.com", recipients=[email])
+    msg = Message(
+        "Booking Confirmation", sender="joshsparkes6@gmail.com", recipients=[email]
+    )
     msg.body = "Your booking has been confirmed."
     mail.send(msg)
+
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
