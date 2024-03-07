@@ -1,0 +1,45 @@
+{
+  "ScheduleResource": {
+    "Schedule": [
+      {
+        "TotalJourney": {
+          "Duration": "PT1H5M"
+        },
+        "Flight": {
+          "Departure": {
+            "AirportCode": "ZRH",
+            "ScheduledTimeLocal": {
+              "DateTime": "2024-04-23T07:00"
+            }
+          },
+          "Arrival": {
+            "AirportCode": "FRA",
+            "ScheduledTimeLocal": {
+              "DateTime": "2024-04-23T08:05"
+            },
+            "Terminal": {
+              "Name": "1"
+            }
+          },
+          "MarketingCarrier": {
+            "AirlineID": "LH",
+            "FlightNumber": "5737"
+          },
+          "Equipment": {
+            "AircraftCode": "290"
+          },
+          "Details": {
+            "Stops": {
+              "StopQuantity": 0
+            },
+            "DaysOfOperation": "2367",
+            "DatePeriod": {
+              "Effective": "2024-04-21",
+              "Expiration": "2024-05-01"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

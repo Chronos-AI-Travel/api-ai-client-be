@@ -1,9 +1,10 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, redirect, session, url_for
 from flask_cors import CORS
 import requests
 import logging
 from flask_mail import Mail, Message
-from config import DUFFEL_ACCESS_TOKEN
+from config import DUFFEL_ACCESS_TOKEN, LUFTHANSA_API_KEY, LUFTHANSA_API_SECRET
+import json
 
 app = Flask(__name__)
 CORS(app)
@@ -152,6 +153,92 @@ def send_booking_confirmation_email(email):
     )
     msg.body = "Your booking has been confirmed."
     mail.send(msg)
+
+
+@app.route("/oauth/callback")
+def oauth_callback():
+    # Retrieve the authorization code from the query string
+    auth_code = request.args.get("code")
+
+    if not auth_code:
+        return "Authorization code not found in the request", 400
+
+    # Exchange the authorization code for an access token
+    token_url = "https://api.lufthansa.com/v1/oauth/token"
+    client_id = "YOUR_CLIENT_ID"
+    client_secret = "YOUR_CLIENT_SECRET"
+    redirect_uri = "https://api-ai-client-be.onrender.com/oauth/callback"
+
+    payload = {
+        "grant_type": "authorization_code",
+        "code": auth_code,
+        "redirect_uri": redirect_uri,
+        "client_id": client_id,
+        "client_secret": client_secret,
+    }
+
+    try:
+        response = requests.post(token_url, data=payload)
+        response.raise_for_status()
+        token_data = response.json()
+
+        # Here you would typically save the token to the session or a database
+        # For example: session['access_token'] = token_data['access_token']
+
+        # Redirect or respond as necessary for your application flow
+        return "Authorization successful. Access token obtained."
+    except requests.exceptions.HTTPError as err:
+        return f"Failed to obtain access token: {err}", 500
+
+
+def get_lufthansa_token():
+    token_url = "https://api.lufthansa.com/v1/oauth/token"
+    payload = {
+        "client_id": LUFTHANSA_API_KEY,
+        "client_secret": LUFTHANSA_API_SECRET,
+        "grant_type": "client_credentials",
+    }
+    response = requests.post(token_url, data=payload)
+    if response.status_code == 200:
+        token_data = response.json()
+        return token_data["access_token"]
+    else:
+        logging.error(f"Failed to obtain Lufthansa access token: {response.text}")
+        return None
+
+
+def fetch_best_fares(origin, destination, departure_date, return_date, cabin_class="ECONOMY"):
+    access_token = get_lufthansa_token()
+    if not access_token:
+        print("Failed to obtain access token. Cannot fetch fares.")
+        return
+
+    url = "https://api.lufthansa.com/v1/offers/faresbestprice/bestfares"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Accept": "application/json"
+    }
+    params = {
+        "origin": origin,
+        "destination": destination,
+        "departureDate": departure_date,
+        "returnDate": return_date,
+        "cabinClass": cabin_class,
+        "duration": "P0Y0M7D",  # Example duration of 7 days
+        "viewBy": "DAY"  # Can be DAY or MONTH
+    }
+    
+    response = requests.get(url, headers=headers, params=params)
+    
+    if response.status_code == 200:
+        offers = response.json()
+        print(json.dumps(offers, indent=4))  # Pretty print the JSON response
+    else:
+        logging.error(f"Failed to fetch best fares. Status Code: {response.status_code}")
+        print(response.text)
+
+# Example usage
+fetch_best_fares("FRA", "JFK", "2023-12-01", "2023-12-08")
 
 
 if __name__ == "__main__":
