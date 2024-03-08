@@ -4,6 +4,10 @@ import requests
 import logging
 from flask_mail import Mail, Message
 from config import DUFFEL_ACCESS_TOKEN
+from config import HOTELBEDS_API_KEY, HOTELBEDS_SECRET
+import hashlib
+import time
+
 
 app = Flask(__name__)
 CORS(app)
@@ -153,48 +157,58 @@ def send_booking_confirmation_email(email):
     msg.body = "Your booking has been confirmed."
     mail.send(msg)
 
-@app.route('/search_hotels', methods=['POST'])
-def search_hotels():
-    # Extract search parameters from the request body
-    search_params = request.json
 
-    # Agoda API endpoint
-    agoda_api_url = "AGODA_API_ENDPOINT"  # Replace with the actual Agoda API endpoint
+def get_hotel_availability():
+    # Endpoint for the hotel availability
+    url = "https://api.test.hotelbeds.com/hotel-api/1.0/hotels"
 
-    # Headers including the API key for authorization
+    # Current timestamp
+    timestamp = str(int(time.time()))
+
+    # Generate the signature
+    signature = hashlib.sha256(
+        (HOTELBEDS_API_KEY + HOTELBEDS_SECRET + timestamp).encode()
+    ).hexdigest()
+
+    # Headers including the authentication
     headers = {
+        "Api-key": HOTELBEDS_API_KEY,
+        "X-Signature": signature,
+        "Accept": "application/json",
         "Content-Type": "application/json",
-        "Authorization": "123456:00000000-0000-0000-0000-000000000000"  # Use the provided authorization token
     }
 
-    # Adjust the payload based on Agoda's API requirements
-    payload = {
-        "location": search_params.get("location"),
-        "checkIn": search_params.get("checkin"),
-        "checkOut": search_params.get("checkout"),
-        "adults": search_params.get("adults"),
-        "children": search_params.get("children", 0),
-        "rooms": search_params.get("rooms", 1),
+    # Adjusted data for the request body without specific hotel codes
+    data = {
+        "stay": {"checkIn": "2024-12-15", "checkOut": "2024-12-16"},
+        "occupancies": [{"rooms": 1, "adults": 2, "children": 0}],
+        "destination": {"code": "PMI"},  # Example destination code
     }
 
-    try:
-        # Make the POST request to Agoda's API
-        response = requests.post(agoda_api_url, json=payload, headers=headers)
+    # Make the POST request
+    response = requests.post(url, headers=headers, json=data)
 
-        # Check if the request was successful
-        response.raise_for_status()
+    # Check if the request was successful
+    if response.status_code == 200:
+        response_data = response.json()
+        hotels_data = response_data["hotels"]["hotels"]
 
-        # Parse the response JSON
-        data = response.json()
+        # Process each hotel to extract and print the required information
+        for hotel in hotels_data:
+            hotel_info = {
+                "name": hotel.get("name"),
+                "destinationName": hotel.get("destinationName"),
+                "categoryName": hotel.get("categoryName"),
+                "zoneName": hotel.get("zoneName"),
+                "roomsCount": len(hotel.get("rooms", []))
+            }
+            print(hotel_info)
+    else:
+        print(f"Error: {response.status_code}, {response.text}")
 
-        # Return the data to the frontend
-        return jsonify(data)
-
-    except requests.RequestException as e:
-        # Handle any errors that occur during the request
-        print(e)
-        return jsonify({"error": "Failed to fetch data from Agoda API"}), 500
-
+# Example usage
+if __name__ == "__main__":
+    get_hotel_availability()
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
