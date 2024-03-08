@@ -4,6 +4,9 @@ import requests
 import logging
 from flask_mail import Mail, Message
 from config import DUFFEL_ACCESS_TOKEN
+from config import SKYSCANNER_API_KEY
+import urllib.parse
+
 
 app = Flask(__name__)
 CORS(app)
@@ -152,6 +155,54 @@ def send_booking_confirmation_email(email):
     )
     msg.body = "Your booking has been confirmed."
     mail.send(msg)
+
+
+@app.route("/search_hotels", methods=["POST"])
+def search_hotels():
+    data = request.json
+    checkin = data["checkin"]
+    checkout = data["checkout"]
+    adults = data["adults"]
+    rooms = data["rooms"]
+    entity_id = data.get("entity_id", "27539733")  # Example entity ID, consider making this dynamic
+    mediaPartnerId = "yourMediaPartnerIdHere"  # Replace with your actual Media Partner ID
+
+    # Construct the referral URL
+    base_url = "https://skyscanner.net/g/referrals/v1/hotels/day-view"
+    params = {
+        "entity_id": entity_id,
+        "checkin": checkin,
+        "checkout": checkout,
+        "adults": adults,
+        "rooms": rooms,
+        "mediaPartnerId": mediaPartnerId,
+    }
+    referral_url = f"{base_url}?{urllib.parse.urlencode(params)}"
+
+    # Log the referral URL for debugging
+    logging.info(f"Generated referral URL: {referral_url}")
+
+    # Print the referral URL to the console (server side)
+    print(f"Generated referral URL: {referral_url}")
+
+    # Return the referral URL to the frontend
+    return jsonify({"referral_url": referral_url})
+
+
+def generate_hotels_day_view_url(entity_id, checkin, checkout, adults, rooms, market="US", locale="en-US", currency="USD"):
+    base_url = "https://skyscanner.net/g/referrals/v1/hotels/day-view"
+    params = {
+        "entity_id": entity_id,
+        "checkin": checkin,
+        "checkout": checkout,
+        "adults": adults,
+        "rooms": rooms,
+        "market": market,
+        "locale": locale,
+        "currency": currency
+    }
+    url = f"{base_url}?{urllib.parse.urlencode(params)}"
+    return url
 
 
 if __name__ == "__main__":
