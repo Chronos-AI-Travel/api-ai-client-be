@@ -153,6 +153,48 @@ def send_booking_confirmation_email(email):
     msg.body = "Your booking has been confirmed."
     mail.send(msg)
 
+@app.route('/search_hotels', methods=['POST'])
+def search_hotels():
+    # Extract search parameters from the request body
+    search_params = request.json
+
+    # Agoda API endpoint
+    agoda_api_url = "AGODA_API_ENDPOINT"  # Replace with the actual Agoda API endpoint
+
+    # Headers including the API key for authorization
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": "123456:00000000-0000-0000-0000-000000000000"  # Use the provided authorization token
+    }
+
+    # Adjust the payload based on Agoda's API requirements
+    payload = {
+        "location": search_params.get("location"),
+        "checkIn": search_params.get("checkin"),
+        "checkOut": search_params.get("checkout"),
+        "adults": search_params.get("adults"),
+        "children": search_params.get("children", 0),
+        "rooms": search_params.get("rooms", 1),
+    }
+
+    try:
+        # Make the POST request to Agoda's API
+        response = requests.post(agoda_api_url, json=payload, headers=headers)
+
+        # Check if the request was successful
+        response.raise_for_status()
+
+        # Parse the response JSON
+        data = response.json()
+
+        # Return the data to the frontend
+        return jsonify(data)
+
+    except requests.RequestException as e:
+        # Handle any errors that occur during the request
+        print(e)
+        return jsonify({"error": "Failed to fetch data from Agoda API"}), 500
+
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
