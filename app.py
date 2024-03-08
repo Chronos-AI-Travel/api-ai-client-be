@@ -4,6 +4,7 @@ import requests
 import logging
 from flask_mail import Mail, Message
 from config import DUFFEL_ACCESS_TOKEN
+from config import AIR_FRANCE_KEY, AIR_FRANCE_SECRET
 
 app = Flask(__name__)
 CORS(app)
@@ -153,6 +154,41 @@ def send_booking_confirmation_email(email):
     msg.body = "Your booking has been confirmed."
     mail.send(msg)
 
+
+def fetch_air_france_offers():
+    url = "https://api.airfranceklm.com/offers"  # This is a placeholder URL. Replace it with the actual Air France API endpoint for fetching offers.
+    headers = {
+        "Content-Type": "application/json",
+        "Api-Key": AIR_FRANCE_KEY,
+        # Air France might require additional headers for authentication, such as OAuth tokens.
+        # You'll need to follow the Air France API documentation for the correct authentication method.
+    }
+    # The payload structure depends on the Air France API documentation. Adjust accordingly.
+    payload = {
+        "origin": "PAR",
+        "destination": "NYC",
+        "departureDate": "2023-12-25",
+        # Include other necessary parameters as per the Air France API documentation.
+    }
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        response.raise_for_status()  # This will raise an exception for HTTP error responses.
+        offers_response = response.json()
+
+        # Process the offers_response as per your application's needs.
+        # This might involve extracting the offers and formatting them for your frontend.
+
+        return jsonify(offers_response)  # Adjust this return statement based on how you process the response.
+    except requests.exceptions.HTTPError as http_err:
+        logging.error(f"HTTP error occurred: {http_err} - {response.text}")
+        return jsonify({"error": "Failed to fetch offers"}), response.status_code
+    except Exception as err:
+        logging.error(f"An error occurred: {err}")
+        return jsonify({"error": "An unexpected error occurred"}), 500
+    
+@app.route("/get_air_france_offers", methods=["POST"])
+def get_air_france_offers():
+    return fetch_air_france_offers()
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
