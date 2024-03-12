@@ -4,6 +4,10 @@ import requests
 import logging
 from flask_mail import Mail, Message
 from config import DUFFEL_ACCESS_TOKEN
+from config import HOTELBEDS_API_KEY, HOTELBEDS_SECRET
+import hashlib
+import time
+
 
 app = Flask(__name__)
 CORS(app)
@@ -152,6 +156,80 @@ def send_booking_confirmation_email(email):
     )
     msg.body = "Your booking has been confirmed."
     mail.send(msg)
+
+
+@app.route("/get_hotel_availability", methods=["POST"])
+def get_hotel_availability():
+    # Extract search parameters from the request body
+    search_params = request.json
+    check_in = search_params.get("checkIn")
+    check_out = search_params.get("checkOut")
+    adults = search_params.get("adults")
+    children = search_params.get("children")
+    rooms = search_params.get("rooms")
+    destination_code = search_params.get("destination")
+
+    # Endpoint for the hotel availability
+    url = "https://api.test.hotelbeds.com/hotel-api/1.0/hotels"
+
+    # Current timestamp
+    timestamp = str(int(time.time()))
+
+    # Generate the signature
+    signature = hashlib.sha256(
+        (HOTELBEDS_API_KEY + HOTELBEDS_SECRET + timestamp).encode()
+    ).hexdigest()
+
+    # Headers including the authentication
+    headers = {
+        "Api-key": HOTELBEDS_API_KEY,
+        "X-Signature": signature,
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+
+    # Adjusted data for the request body using dynamic parameters
+    data = {
+        "stay": {"checkIn": check_in, "checkOut": check_out},
+        "occupancies": [{"rooms": rooms, "adults": adults, "children": children}],
+        "destination": {"code": destination_code},  # Use dynamic destination code
+    }
+
+    # Make the POST request
+    response = requests.post(url, headers=headers, json=data)
+
+    # Check if the request was successful
+    if response.status_code == 200:
+        response_data = response.json()
+        hotels_data = response_data.get("hotels", {}).get("hotels", [])
+
+        # Process each hotel to extract and return the required information, including pricing
+        hotels_info = []
+        for hotel in hotels_data:
+            # Directly use 'minRate' and 'currency' as they are both strings
+            price_amount = hotel.get("minRate", "N/A")  # Default to "N/A" if not found
+            price_currency = hotel.get(
+                "currency", "N/A"
+            )  # Default to "N/A" if not found
+
+            hotel_info = {
+                "name": hotel.get("name"),
+                "destinationName": hotel.get("destinationName"),
+                "categoryName": hotel.get("categoryName"),
+                "zoneName": hotel.get("zoneName"),
+                "roomsCount": len(hotel.get("rooms", [])),
+                "price": price_amount,
+                "currency": price_currency,
+                "code": hotel.get("code"),
+            }
+            hotels_info.append(hotel_info)
+
+        return jsonify(hotels_info)
+    else:
+        return (
+            jsonify({"error": f"Failed to fetch hotels: {response.text}"}),
+            response.status_code,
+        )
 
 
 if __name__ == "__main__":
