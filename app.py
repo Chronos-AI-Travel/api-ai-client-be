@@ -158,7 +158,17 @@ def send_booking_confirmation_email(email):
     mail.send(msg)
 
 
+@app.route("/get_hotel_availability", methods=["POST"])
 def get_hotel_availability():
+    # Extract search parameters from the request body
+    search_params = request.json
+    check_in = search_params.get("checkIn")
+    check_out = search_params.get("checkOut")
+    adults = search_params.get("adults")
+    children = search_params.get("children")
+    rooms = search_params.get("rooms")
+    destination_code = search_params.get("destination")
+
     # Endpoint for the hotel availability
     url = "https://api.test.hotelbeds.com/hotel-api/1.0/hotels"
 
@@ -178,11 +188,11 @@ def get_hotel_availability():
         "Content-Type": "application/json",
     }
 
-    # Adjusted data for the request body without specific hotel codes
+    # Adjusted data for the request body using dynamic parameters
     data = {
-        "stay": {"checkIn": "2024-12-15", "checkOut": "2024-12-16"},
-        "occupancies": [{"rooms": 1, "adults": 2, "children": 0}],
-        "destination": {"code": "PMI"},  # Example destination code
+        "stay": {"checkIn": check_in, "checkOut": check_out},
+        "occupancies": [{"rooms": rooms, "adults": adults, "children": children}],
+        "destination": {"code": destination_code},  # Use dynamic destination code
     }
 
     # Make the POST request
@@ -191,24 +201,36 @@ def get_hotel_availability():
     # Check if the request was successful
     if response.status_code == 200:
         response_data = response.json()
-        hotels_data = response_data["hotels"]["hotels"]
+        hotels_data = response_data.get("hotels", {}).get("hotels", [])
 
-        # Process each hotel to extract and print the required information
+        # Process each hotel to extract and return the required information, including pricing
+        hotels_info = []
         for hotel in hotels_data:
+            # Directly use 'minRate' and 'currency' as they are both strings
+            price_amount = hotel.get("minRate", "N/A")  # Default to "N/A" if not found
+            price_currency = hotel.get(
+                "currency", "N/A"
+            )  # Default to "N/A" if not found
+
             hotel_info = {
                 "name": hotel.get("name"),
                 "destinationName": hotel.get("destinationName"),
                 "categoryName": hotel.get("categoryName"),
                 "zoneName": hotel.get("zoneName"),
-                "roomsCount": len(hotel.get("rooms", []))
+                "roomsCount": len(hotel.get("rooms", [])),
+                "price": price_amount,
+                "currency": price_currency,
+                "code": hotel.get("code"),
             }
-            print(hotel_info)
-    else:
-        print(f"Error: {response.status_code}, {response.text}")
+            hotels_info.append(hotel_info)
 
-# Example usage
-if __name__ == "__main__":
-    get_hotel_availability()
+        return jsonify(hotels_info)
+    else:
+        return (
+            jsonify({"error": f"Failed to fetch hotels: {response.text}"}),
+            response.status_code,
+        )
+
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
